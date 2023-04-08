@@ -2,22 +2,48 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-#markers = ('o', '^', 's', 'p', 'h', 'x', 'D')
+normcoeff = []
 
 # нормировка исходных данных
 def norm(X):
-    NX = X / 255
-    NX[NX < 0] = 0
-    NX[NX > 1] = 1
+    TX = np.asarray(X, dtype=float).T
+    for i in range(len(TX)):
+        k = 3 if (i+1 == len(TX)) else 1
+        normcoeff.append((1 / np.std(TX[i]), np.median(TX[i])))
+        TX[i] = k * (TX[i] * normcoeff[-1][0] - normcoeff[-1][1] * normcoeff[-1][0])
+    NX = TX.T
     return NX
 
-def plotColors(colors):
-    sz = len(colors)
+def denorm(X):
+    TX = np.asarray(X, dtype=float).T
+    for i in range(len(TX)):
+        k = 3 if (i + 1 == len(TX)) else 1
+        TX[i] = (TX[i] / k + normcoeff[i][1] * normcoeff[i][0]) / normcoeff[i][0]
+    NX = TX.T
+    return NX
+
+
+def getcolors(X):
+    if (len(X)>0):
+        CX = X[:, 0:3]
+        CX = CX / 255
+        CX[CX < 0] = 0
+        CX[CX > 1] = 1
+    else:
+        CX = np.array([])
+    return CX
+
+def plotData(data):
+    sz = len(data)
+    if sz == 0 :
+        return
+    cdata = getcolors(data)
     qsz = math.ceil(math.sqrt(sz))
-    lnc = math.ceil(sz / qsz)
+    #lnc = math.ceil(sz / qsz)
     xpoints = np.array([1+int(i / qsz) for i in range(sz)])
     ypoints = np.array([1+i % qsz for i in range(sz)])
-    plt.scatter(xpoints, ypoints, c=colors)
+    #cmrk = np.empty(sz, dtype=str)
+    plt.scatter(xpoints, ypoints, c=cdata, s=data[:,-1])
     plt.show()
 
 dist = lambda a, b: np.sqrt(np.sum((a - b) ** 2))
@@ -31,31 +57,55 @@ def learn(inp, nrn):
     while la > 0:
         for e in range(epoches):
             for c in inp:
-                ivin = nearest(c, nrn)
-                nrn[ivin] = nrn[ivin] + la * (c - nrn[ivin])
+                iwin = nearest(c, nrn)
+                nrn[iwin] = nrn[iwin] + la * (c - nrn[iwin])
         la -= dla
 
 def sort(inp, nrn):
     K = len(nrn)
     cluster = [[] for i in range(K)]
-    for c in inp:
-        cluster[nearest(c, nrn)].append(c)
+    ninp = norm(inp)
+    for i in range(len(inp)):
+        cluster[nearest(ninp[i], nrn)].append(inp[i])
+    for i in range(len(cluster)):
+        cluster[i] = np.array(cluster[i])
     return cluster
 
 def show_clusters(clusters):
     for cluster in clusters:
-        plotColors(cluster)
+        plotData(cluster)
 
 #число классов
-K = 5
-#число эпох обучения
-epoches = 100
-#нейроны сети
-W = np.random.random((K, 3))*0.3
+K = 12
 
-colors = np.asarray(np.loadtxt("colors.txt"), dtype=int)
-ncolors = norm(colors)
-plotColors(ncolors)
-learn(ncolors, W)
-clusters = sort(ncolors, W)
+#число эпох обучения
+epoches = 50
+
+#исходные данные
+data = np.asarray(np.loadtxt("data.txt"), dtype=int)
+
+#нейроны сети
+W = np.random.random((K, len(data[0])))*0.3
+# W = [[255, 0, 0, 74 ],
+#      [255, 0, 0, 221],
+#      [255, 0, 0, 466],
+#      [255, 0, 0, 809],
+#      [0, 255, 0, 74 ],
+#      [0, 255, 0, 221],
+#      [0, 255, 0, 466],
+#      [0, 255, 0, 809],
+#      [0, 0, 255, 74 ],
+#      [0, 0, 255, 221],
+#      [0, 0, 255, 466],
+#      [0, 0, 255, 809]]
+# W = norm(W)
+
+plotData(data)
+ndata = norm(data)
+learn(ndata, W)
+clusters = sort(data, W)
+#dclusters = []
+#for i in range(len(clusters)):
+#    dclusters.append(denorm(clusters[i]))
 show_clusters(clusters)
+
